@@ -2,6 +2,8 @@ const http = require("http");
 const socket = require("./socket");
 const { CANVAS_HEIGHT, CANVAS_WIDTH } = require("./constants");
 
+const ROOM_NAME = "1234";
+
 const requestListener = function (req, res) {
   res.writeHead(200);
   res.end("Welcome to shit game!");
@@ -35,14 +37,17 @@ const addPlayer = (idSocket) => {
 };
 
 const removePlayer = (idPlayer) => {
-  ships.slice(ships.findIndex(({ id }) => id === idPlayer));
+  ships.splice(
+    ships.findIndex(({ id }) => id === idPlayer),
+    1
+  );
 };
 
 socket.addHandler("joinGame", (socket) => (roomId, callback) => {
   socket.join(roomId);
   const player = addPlayer(socket.id);
   callback(ships, socket.id);
-  socket.broadcast.to("1234").emit("newEnemy", player);
+  socket.broadcast.to(ROOM_NAME).emit("newEnemy", player);
 });
 
 socket.addHandler("updateStatus", (socket) => (modified) => {
@@ -50,40 +55,21 @@ socket.addHandler("updateStatus", (socket) => (modified) => {
   if (orig) {
     updateObj(orig, modified);
     console.log(orig);
-    socket.broadcast.to("1234").emit("updatedEnemy", orig);
+    socket.broadcast.to(ROOM_NAME).emit("updatedEnemy", orig);
   }
 });
-
-socket.addHandler("disconect", (socket) => () => {
-  removePlayer(socket.id);
-});
-
-/*
-socket.addHandler("JoinEvent", (socket) => (data) => {
-    socket.join(data.eventId);
-    Controller.userController.eventAudioListing(data);
-  });
-  socket.addHandler("JoinEventAsAdmin", (socket) => (data) => {
-    socket.join(`${data.eventId}/admin`);
-  });
-  socket.addHandler("RequestEventDataFromAdmin", (socket) => (data) => {
-    socket.join(`${data.eventId}/socket/${data.socketId}`);
-    socket.broadcast
-      .to(`${data.eventId}/admin`)
-      .emit(
-        "RequestEventDataFromAdmin",
-        `${data.eventId}/socket/${data.socketId}`
-      );
-  });
-  socket.addHandler("SendEventDataToClient", (socket) => (data) => {
-    if (data.socketRoom)
-      socket.broadcast
-        .to(data.socketRoom)
-        .emit("SendEventDataToClient", data.eventData);
-  });
-*/
 
 socket.setDebugging(true);
 socket.initInstance(server);
 
 server.listen(3000);
+
+setInterval(() => {
+  const io = socket.getIoInstance();
+  for (let player of ships) {
+    if (!io.sockets.adapter.rooms.has(player.id)) {
+      removePlayer(player.id);
+      io.to(ROOM_NAME).emit("userLeave", player.id);
+    }
+  }
+}, 2000);

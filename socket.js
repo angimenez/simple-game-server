@@ -1,6 +1,7 @@
 // TODO think another good name for the file
 const { Server } = require("socket.io");
 let socketInstance;
+let ioInstance;
 
 function Handler(event, handler) {
   this.event = event;
@@ -27,6 +28,9 @@ const initInstance = (server) => {
   const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
   });
+  
+  ioInstance = io;
+
   io.on("connection", function (socket) {
     socketInstance = socket;
     if (debugging) {
@@ -44,9 +48,20 @@ const initInstance = (server) => {
 
 const getSocket = () => socketInstance;
 
+const getIoInstance = () => ioInstance;
+
+const getClientRoomCount = (roomName) => {
+  if (ioInstance && ioInstance.sockets.adapter.rooms.has(roomName)) {
+    return ioInstance.sockets.adapter.rooms.get(roomName).size;
+  }
+  return 0;
+};
+
 module.exports = {
   initInstance,
   addHandler,
   setDebugging,
   getSocket,
+  getIoInstance,
+  getClientRoomCount,
 };
