@@ -30,7 +30,8 @@ const addPlayer = (idSocket) => {
     width: 50,
     height: 50,
     key_pressed: {},
-    speed: 0.8,
+    vx: 0.8,
+    vy: 0.8,
   };
   ships.push(player);
   return player;
@@ -50,19 +51,24 @@ socket.addHandler("joinGame", (socket) => (roomId, callback) => {
   socket.broadcast.to(ROOM_NAME).emit("newEnemy", player);
 });
 
-socket.addHandler("updateStatus", (socket) => (modified) => {
+socket.addHandler("updateStatus", (socket) => (modified, cb) => {
   const orig = ships.find(({ id }) => id === modified.id);
   if (orig) {
     updateObj(orig, modified);
     console.log(orig);
     socket.broadcast.to(ROOM_NAME).emit("updatedEnemy", orig);
+    if (typeof cb === "function") {
+      cb();
+    }
   }
 });
 
 socket.setDebugging(true);
 socket.initInstance(server);
 
-server.listen(3000);
+server.listen(3000, () => {
+  console.log("Super Game Server corriendo en el puerto 3000");
+});
 
 setInterval(() => {
   const io = socket.getIoInstance();
