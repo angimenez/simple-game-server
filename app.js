@@ -1,6 +1,8 @@
 const http = require("http");
 const socket = require("./socket");
 const { CANVAS_HEIGHT, CANVAS_WIDTH } = require("./constants");
+const { Ship } = require("./prototypes");
+const time = require("./time");
 
 const ROOM_NAME = "1234";
 
@@ -17,22 +19,23 @@ const randomNumber = (min, max) => parseInt(Math.random() * (max - min) + min);
 const ships = [];
 
 const updateObj = (original, modified) => {
-  for (let key in modified) {
-    if (key !== "id") original[key] = modified[key];
-  }
+  original["key_pressed"] = modified["key_pressed"];
+  // for (let key in modified) {
+  // if (key !== "id") original[key] = modified[key];
+  // }
 };
 
 const addPlayer = (idSocket) => {
-  const player = {
-    id: idSocket,
-    x: randomNumber(0, 700),
-    y: randomNumber(0, 300),
-    width: 50,
-    height: 50,
-    key_pressed: {},
-    vx: 0.8,
-    vy: 0.8,
-  };
+  const player = new Ship(
+    idSocket,
+    randomNumber(0, 700),
+    randomNumber(0, 300),
+    50,
+    50,
+    {},
+    0.8,
+    0.8
+  );
   ships.push(player);
   return player;
 };
@@ -55,7 +58,6 @@ socket.addHandler("updateStatus", (socket) => (modified, cb) => {
   const orig = ships.find(({ id }) => id === modified.id);
   if (orig) {
     updateObj(orig, modified);
-    console.log(orig);
     socket.broadcast.to(ROOM_NAME).emit("updatedEnemy", orig);
     if (typeof cb === "function") {
       cb();
@@ -68,14 +70,27 @@ socket.initInstance(server);
 
 server.listen(3000, () => {
   console.log("Super Game Server corriendo en el puerto 3000");
+
+  time.initializeTime();
+  gameLoop();
 });
 
-setInterval(() => {
+function updateShips() {
   const io = socket.getIoInstance();
   for (let player of ships) {
     if (!io.sockets.adapter.rooms.has(player.id)) {
       removePlayer(player.id);
       io.to(ROOM_NAME).emit("userLeave", player.id);
+    } else {
+      player.updateStatus(ships);
+      player.updateShield();
+      io.to(ROOM_NAME).emit("updatedStatusServer", player);
     }
   }
-}, 2000);
+}
+
+const gameLoop = () => {
+  time.updateDeltaTime();
+  updateShips();
+  setTimeout(() => gameLoop(), 1000 / 60);
+};
